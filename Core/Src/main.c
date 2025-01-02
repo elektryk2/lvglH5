@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "lvgl.h"
 #include "LCDController.h"
+#include "lv_port_indev_template.h"
 #include "demos/benchmark/lv_demo_benchmark.h"
 #include "ui.h"
 #include "linked_list.h"
@@ -72,6 +73,10 @@ extern DMA_QListTypeDef Queue_rx;
 extern objects_t objects;
 
 extern  lv_meter_indicator_t * indicator1;
+
+extern bool touchpad_pressed;
+extern uint16_t touchpad_x, touchpad_y;
+
  ADC_ChannelConfTypeDef sConfig_read;
 /* USER CODE END PV */
 
@@ -182,6 +187,30 @@ int main(void)
   MX_ICACHE_Init();
   MX_DCACHE1_Init();
   /* USER CODE BEGIN 2 */
+  //mainAdc();
+
+  /* Perform ADC calibration */
+  if (HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED) != HAL_OK)
+  {
+    /* Calibration Error */
+    Error_Handler();
+  }
+
+
+  Touch_Init();
+
+// // X_Init();
+//  while(1)
+//  {
+//		static float x1 = 0, y1 = 0;
+//		if (TouchRead(&x1, &y1))
+//		{
+//			x1 = (x1 - 383) / (3793-383) * 320;
+//			y1 = (y1 - 414) / (3676-414) * 280;
+//
+//		}
+//  }
+
 
   MX_Queue_tx_Config();
   HAL_DMAEx_List_LinkQ(&handle_GPDMA1_Channel7, &Queue_tx);
@@ -199,6 +228,7 @@ int main(void)
 
 
   lv_port_disp_init();
+  lv_port_indev_init();
   HAL_GPIO_WritePin(DSP_BL_GPIO_Port,DSP_BL_Pin,GPIO_PIN_SET);HAL_GPIO_WritePin(DSP_BL_GPIO_Port,DSP_BL_Pin,GPIO_PIN_SET);
   // Change the active screen's background color
   lv_obj_set_style_bg_color(lv_scr_act(), lv_color_hex(0x003a57), LV_PART_MAIN);
@@ -233,20 +263,27 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  lv_timer_handler();
-	  HAL_Delay(5);
+	  //HAL_Delay(5);
 	 // continue;
+
 
 		static float x1 = 0, y1 = 0;
 		if (TouchRead(&x1, &y1))
 		{
-			y1 = (y1 - 430) / 3130 * 280;
-			x1 = (x1 - 395) / 3255 * 320;
+			x1 = (x1 - 383) / (3793-383) * 320;
+			y1 = (y1 - 414) / (3676-414) * 240;
+			touchpad_pressed=1;
+			touchpad_x=x1;
+			touchpad_y=240-y1;
 		}
-		// continue;
+		else
+			touchpad_pressed=0;
+
+
 
 	  if(y>800)
 	  {
-		  yy++;
+		 // yy++;
 		  y=0;
 		  if(yy>3) yy=1;
 		  loadScreen(yy);
@@ -266,9 +303,6 @@ int main(void)
 //          }
 //
           lv_chart_refresh(objects.chart1); /*Required after direct set*/
-
-
-
 	  }
 	  if(xx<80)
 	  {
@@ -380,7 +414,7 @@ static void MX_ADC1_Init(void)
   hadc1.Init.Resolution = ADC_RESOLUTION_12B;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
-  hadc1.Init.EOCSelection = ADC_EOC_SEQ_CONV;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   hadc1.Init.LowPowerAutoWait = DISABLE;
   hadc1.Init.ContinuousConvMode = DISABLE;
   hadc1.Init.NbrOfConversion = 1;
@@ -389,7 +423,7 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc1.Init.DMAContinuousRequests = DISABLE;
   hadc1.Init.SamplingMode = ADC_SAMPLING_MODE_NORMAL;
-  hadc1.Init.Overrun = ADC_OVR_DATA_OVERWRITTEN;
+  hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
   hadc1.Init.OversamplingMode = DISABLE;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
   {
@@ -832,7 +866,7 @@ static void MX_GPIO_Init(void)
                           |DSP_BL_Pin|EN3_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(TEST_PIN_GPIO_Port, TEST_PIN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, TEST_PIN_Pin|GPIO_PIN_5|GPIO_PIN_6, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(NTRIG_GPIO_Port, NTRIG_Pin, GPIO_PIN_SET);
@@ -853,6 +887,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   HAL_GPIO_Init(TEST_PIN_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PA5 PA6 */
+  GPIO_InitStruct.Pin = GPIO_PIN_5|GPIO_PIN_6;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : NPWRDWN_Pin */
   GPIO_InitStruct.Pin = NPWRDWN_Pin;
